@@ -1,9 +1,21 @@
 class Bullet {
-    constructor()
+    constructor(x, y, shape, radius, speed, damage, tankId)
     {
-        this.shape = 'circle'
-        this.radium = radium
+        this.x = x
+        this.y = y
+        this.shape = shape
+        this.radius = radius
         this.speed = speed
         this.damage = damage
+        this.tankId = tankId
+    }
+
+    drawOnMap() {
+        $('canvas').drawArc({
+            fillStyle: 'red',
+            x: this.x,
+            y: this.y,
+            radius: this.radius
+        });
     }
 }
