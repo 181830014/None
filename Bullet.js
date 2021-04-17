@@ -1,7 +1,7 @@
 class Bullet {
     constructor()
     {
-        this.shape = shape
+        this.shape = 'circle'
         this.radium = radium
         this.speed = speed
         this.damage = damage
