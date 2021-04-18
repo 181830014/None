@@ -9,6 +9,7 @@ const CANVAS_WIDTH = 200;   // TODO
 const CANVAS_HEIGHT = 200;  // TODO
 // const UPGRADE_THRESHOLD_ARRAY = []
 
+/* tmp start*/
 class Creep {
     constructor(x, y, shape, radius, damage, healthPoint, experience)
     {
@@ -52,10 +53,15 @@ class Creep {
         return 0;
     }
 }
+/* tmp end*/
 
 var tankList = [];
 var bulletList = [];
 var creepList = [];
+
+function isCollide(object1, object2) {  // 判断两物块是否碰撞
+    // TODO
+}
 
 var testCreep = new Creep (x=CANVAS_WIDTH * Math.ceil(Math.random()),
     y=CANVAS_HEIGHT * Math.ceil(Math.random()), shape=TRIANGLE, radius=30,
