@@ -7,7 +7,7 @@ class Bullet {
         this.radius = radius
         this.speed = speed
         this.damage = damage
-        this.tankId = tankId
+        this.tankName = tankName
     }
 
     drawOnMap() {

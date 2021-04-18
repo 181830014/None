@@ -1,15 +1,14 @@
-const CANVAS_LEFT = 0;   // TODO
+const CANVAS_LEFT = 0;
 const CANVAS_RIGHT = 300;
 const CANVAS_BOTTOM = 0;
-const CANVAS_TOP = 300;  // TODO
+const CANVAS_TOP = 300;
 const CANVAS_WIDTH = 300;
 const CANVAS_HEIGHT = 300;
 
 const MAX_PLAYER_NUMBER = 30;
 const MAX_TANK_GRADE = 30;
-const SPEED_UP_RATE = 10;
-const SPEED_DOWN_RATE = 2;
-const TANK_RADIUS = 30;
+const SPEED_UP_RATE = 10; 
+const SPEED_DOWN_RATE = 2;      // 地图的水平&垂直阻力
 
 const KEYBOARD_UP = 87;
 const KEYBOARD_DOWN = 83;
@@ -24,10 +23,9 @@ const RELOAD_RATE = 5;
 const MAX_BULLET_DISTANCE = 6;
 
 class Tank {
-    constructor(id, name, radius, rotate, xMoveSpeed, yMoveSpeed, type, grade, healthPoint, 
-        regenerationRate, bodyDamage, reloadRate, maxBulletDistance, bullet) {
-        this.id = id            // key
-        this.name = name
+    constructor(name, x, y, radius, rotate, xMoveSpeed, yMoveSpeed, type, grade, 
+        healthPoint, regenerationRate, damage, reloadRate, maxBulletDistance, bullet) {
+        this.name = name        // key
         this.x = x
         this.y = y
         this.radius = radius
@@ -40,7 +38,7 @@ class Tank {
         this.regenerationRate = regenerationRate
         this.xMoveSpeed = xMoveSpeed
         this.yMoveSpeed = yMoveSpeed
-        this.bodyDamage = bodyDamage
+        this.damage = damage
         this.reloadRate = reloadRate
         this.maxBulletDistance = maxBulletDistance
         this.bullet = bullet
@@ -52,7 +50,6 @@ class Tank {
         function: Initialize attributes of tank & Draw it on map.
         */
         this.name = name;
-        this.radius = TANK_RADIUS;
         this.x = CANVAS_LEFT + Math.ceil(Math.random() * CANVAS_WIDTH);
         this.y = CANVAS_BOTTOM + Math.ceil(Math.random() * CANVAS_HEIGHT);
         this.radius = 30;
@@ -61,7 +58,7 @@ class Tank {
         this.grade = 1;
         this.healthPoint = 100;
         this.regenerationRate = 1;
-        this.bodyDamage = 10;
+        this.damage = 10;
         this.reloadRate = 1;
         this.maxBulletDistance = 100;
         this.drawOnMap();
@@ -104,8 +101,16 @@ class Tank {
         input: xDirection(1/-1/0), yDirection(1/-1/0), 1/-1/0 分别表示正/反/无
         function: modify xMoveSpeed and yMoveSpeed
         */
-        this.xMoveSpeed += xDirection * SPEED_UP_RATE - SPEED_DOWN_RATE;
-        this.yMoveSpeed += yDirection * SPEED_UP_RATE - SPEED_DOWN_RATE;       
+        this.xMoveSpeed += xDirection * SPEED_UP_RATE;
+        this.yMoveSpeed += yDirection * SPEED_UP_RATE;
+        if(this.xMoveSpeed > SPEED_DOWN_RATE)
+            this.xMoveSpeed -= SPEED_DOWN_RATE;
+        if(this.xMoveSpeed < -SPEED_DOWN_RATE)
+            this.xMoveSpeed += SPEED_DOWN_RATE;  
+        if(this.yMoveSpeed > SPEED_DOWN_RATE)
+            this.yMoveSpeed -= SPEED_DOWN_RATE;
+        if(this.yMoveSpeed < -SPEED_DOWN_RATE)
+            this.yMoveSpeed += SPEED_DOWN_RATE;  
     }
 
     justifyPosition() {
@@ -129,24 +134,16 @@ class Tank {
         this.justifyPosition()
         // TODO: jCanvas [Maybe $().Animate?]
     }
+
+    fireBullet() {
+        /*
+        function: Fire a bullet & draw the bullet on the map
+        */
+    }
 }
 
 
-var id_pool = [];   // id
-function generateId() {
-    id_pool.sort();
-    var len = id_pool.length();
-    if(len == MAX_PLAYER_NUMBER)
-        return -1;
-    for(var i=1; i<=len; i++)
-        if(id_pool[i-1] != i)
-        {
-            id_pool.push(i);
-            return i;
-        }
-    id_pool.push(len+1);
-    return len+1;
-}
+var name_pool = [];   // name
 
 var tank = new Tank();
 tank.initialize('panda');

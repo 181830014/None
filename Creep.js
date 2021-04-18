@@ -14,34 +14,22 @@ class Creep {
         this.experience = experience    // 经验值
     }
 
-    drawOnMap() {
+    getColor() {
         switch(this.shape) {
-            case TRIANGLE: 
-                $('canvas').drawPolygon({
-                    strokeStyle: 'red',
-                    x: this.x,
-                    y: this.y,
-                    radius: this.radius,
-                    sides: 3
-                }); break;
-            case SQUARE:
-                $('canvas').drawPolygon({
-                    strokeStyle: 'yellow',
-                    x: this.x,
-                    y: this.y,
-                    radius: this.radius,
-                    sides: 4
-                }); break;
-            case PENTAGON:
-                $('canvas').drawPolygon({
-                    strokeStyle: 'purple',
-                    x: this.x,
-                    y: this.y,
-                    radius: this.radius,
-                    sides: 4
-                }); break; 
-            default: return -1;
+            case TRIANGLE: return 'red'
+            case SQUARE: return 'yellow';
+            case PENTAGON: return 'purple';
         }
-        return 0;
     }
+
+    drawOnMap() {
+        $('canvas').drawPolygon({
+            strokeStyle: this.getColor(),
+            x: this.x,
+            y: this.y,
+            radius: this.radius,
+            sides: this.shape
+        });
+    }
+    
 }
