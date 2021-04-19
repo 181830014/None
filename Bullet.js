@@ -1,5 +1,5 @@
 class Bullet {
-    constructor(x, y, shape, radius, speed, damage, tankId)
+    constructor(x, y, shape, radius, speed, damage, tankName)
     {
         this.x = x
         this.y = y

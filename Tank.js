@@ -1,7 +1,7 @@
-const CANVAS_LEFT = 0;
-const CANVAS_RIGHT = 300;
-const CANVAS_BOTTOM = 0;
-const CANVAS_TOP = 300;
+const CANVAS_LEFT = 30;
+const CANVAS_RIGHT = 270;
+const CANVAS_BOTTOM = 30;
+const CANVAS_TOP = 270;
 const CANVAS_WIDTH = 300;
 const CANVAS_HEIGHT = 300;
 
@@ -42,6 +42,7 @@ class Tank {
         this.reloadRate = reloadRate
         this.maxBulletDistance = maxBulletDistance
         this.bullet = bullet
+        this.pointer
     }
 
     initialize(name) {
@@ -61,6 +62,7 @@ class Tank {
         this.damage = 10;
         this.reloadRate = 1;
         this.maxBulletDistance = 100;
+        this.pointer = document.createElement(this.name)
         this.drawOnMap();
     }
 
@@ -142,6 +144,59 @@ class Tank {
     }
 }
 
+class Creep {
+    constructor(x, y, shape, radius, damage, healthPoint, experience)
+    {
+        this.x = x
+        this.y = y
+        this.shape = shape
+        this.radius = radius
+        this.damage = damage
+        this.healthPoint = healthPoint
+        this.experience = experience    // 经验值
+    }
+
+    getColor() {
+        switch(this.shape) {
+            case TRIANGLE: return 'red'
+            case SQUARE: return 'yellow';
+            case PENTAGON: return 'purple';
+        }
+    }
+
+    drawOnMap() {
+        $('canvas').drawPolygon({
+            strokeStyle: 'yellow',
+            x: this.x,
+            y: this.y,
+            radius: this.radius,
+            sides: this.shape
+        });
+    }
+    
+}
+
+class Bullet {
+    constructor(x, y, shape, radius, speed, damage, tankName)
+    {
+        this.x = x
+        this.y = y
+        this.shape = shape
+        this.radius = radius
+        this.speed = speed
+        this.damage = damage
+        this.tankName = tankName
+    }
+
+    drawOnMap() {
+        $('canvas').drawArc({
+            fillStyle: 'red',
+            x: this.x,
+            y: this.y,
+            radius: this.radius
+        });
+    }
+}
 
 var name_pool = [];   // name
 
