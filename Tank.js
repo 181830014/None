@@ -42,7 +42,6 @@ class Tank {
         this.reloadRate = reloadRate
         this.maxBulletDistance = maxBulletDistance
         this.bullet = bullet
-        this.pointer
     }
 
     initialize(name) {
@@ -51,10 +50,13 @@ class Tank {
         function: Initialize attributes of tank & Draw it on map.
         */
         this.name = name;
+        this.bulletNum = 0;
         this.x = CANVAS_LEFT + Math.ceil(Math.random() * CANVAS_WIDTH);
         this.y = CANVAS_BOTTOM + Math.ceil(Math.random() * CANVAS_HEIGHT);
-        this.radius = 30;
+        this.radius = 25;
         this.rotate = Math.ceil(360 * Math.random());
+        this.xMoveSpeed = 0;
+        this.yMoveSpeed = 0;
         this.type = 1;
         this.grade = 1;
         this.healthPoint = 100;
@@ -62,18 +64,19 @@ class Tank {
         this.damage = 10;
         this.reloadRate = 1;
         this.maxBulletDistance = 100;
+        this.bulletDamage = 30;
         this.pointer = document.createElement(this.name)
         this.drawOnMap();
     }
 
     drawOnMap() {
-        $(document).ready(function(){
-            $('canvas').drawArc({
-                fillStyle: 'black',
-                x: this.x, y: this.y,
-                radius: this.radius,
-                rotate: this.rotate
-            })
+        $('canvas').drawArc({
+            layer: true,
+            name: this.name,
+            fillStyle: '#589',
+            x: this.x, y: this.y,
+            radius: this.radius,
+            rotate: this.rotate
         })
     }
 
@@ -98,11 +101,16 @@ class Tank {
         return 0;
     }
 
-    modifySpeed(xDirection, yDirection) {
+    modifySpeed() {
         /*
-        input: xDirection(1/-1/0), yDirection(1/-1/0), 1/-1/0 分别表示正/反/无
         function: modify xMoveSpeed and yMoveSpeed
         */
+        var xDirection = 0, yDirection = 0;
+        if(KEYBOARD_CONDITION & 8) yDirection -= 1;
+        if(KEYBOARD_CONDITION & 4) yDirection += 1;
+        if(KEYBOARD_CONDITION & 2) xDirection -= 1;
+        if(KEYBOARD_CONDITION & 1) xDirection += 1;
+
         this.xMoveSpeed += xDirection * SPEED_UP_RATE;
         this.yMoveSpeed += yDirection * SPEED_UP_RATE;
         if(this.xMoveSpeed > SPEED_DOWN_RATE)
@@ -119,6 +127,10 @@ class Tank {
         /*
         function: 使图像不超出画布
         */
+        if(this.x > CANVAS_RIGHT || this.x < CANVAS_LEFT)
+            this.xMoveSpeed = 0;
+        if(this.y > CANVAS_TOP || this.y < CANVAS_BOTTOM)
+            this.yMoveSpeed = 0;
         this.x = Math.max(this.x, CANVAS_LEFT);
         this.x = Math.min(this.x, CANVAS_RIGHT);
         this.y = Math.max(this.y, CANVAS_BOTTOM);
@@ -129,76 +141,27 @@ class Tank {
         /*
         function: 每个时间片坦克进行一次移动, x+=delta(x), y+=delta(y)
         */
-        var curx = this.x;
-        var cury = this.y;
+        // var curx = this.x;
+        // var cury = this.y;
         this.x += this.xMoveSpeed;
         this.y += this.yMoveSpeed;
         this.justifyPosition()
-        // TODO: jCanvas [Maybe $().Animate?]
+        $('canvas').animateLayer(this.name, {
+            x: this.x, y: this.y
+        }, TIME_GAP - 10);
     }
 
-    fireBullet() {
+    beDamaged() {
+        
+    }
+
+    fireBullet(x, y) {
         /*
         function: Fire a bullet & draw the bullet on the map
         */
+        var bullet = new Bullet();
+        this.bulletNum ++;
+        bullet.initialize(this, this.bulletNum, x - this.x, y - this.y);
+        bulletList.push(bullet);
     }
 }
-
-class Creep {
-    constructor(x, y, shape, radius, damage, healthPoint, experience)
-    {
-        this.x = x
-        this.y = y
-        this.shape = shape
-        this.radius = radius
-        this.damage = damage
-        this.healthPoint = healthPoint
-        this.experience = experience    // 经验值
-    }
-
-    getColor() {
-        switch(this.shape) {
-            case TRIANGLE: return 'red'
-            case SQUARE: return 'yellow';
-            case PENTAGON: return 'purple';
-        }
-    }
-
-    drawOnMap() {
-        $('canvas').drawPolygon({
-            strokeStyle: 'yellow',
-            x: this.x,
-            y: this.y,
-            radius: this.radius,
-            sides: this.shape
-        });
-    }
-    
-}
-
-class Bullet {
-    constructor(x, y, shape, radius, speed, damage, tankName)
-    {
-        this.x = x
-        this.y = y
-        this.shape = shape
-        this.radius = radius
-        this.speed = speed
-        this.damage = damage
-        this.tankName = tankName
-    }
-
-    drawOnMap() {
-        $('canvas').drawArc({
-            fillStyle: 'red',
-            x: this.x,
-            y: this.y,
-            radius: this.radius
-        });
-    }
-}
-
-var name_pool = [];   // name
-
-var tank = new Tank();
-tank.initialize('panda');

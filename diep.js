@@ -11,7 +11,7 @@ const SPEED_UP_RATE = 3;
 const SPEED_DOWN_RATE = 2;      // 地图的水平&垂直阻力
 
 const TIME_GAP = 150;
-const ANIMATE_TIME_GAP = 130;
+const ANIMATE_TIME_GAP = 70;
 const KEYBOARD_UP = 87;
 const KEYBOARD_DOWN = 83;
 const KEYBOARD_LEFT = 65;
@@ -165,8 +165,16 @@ class Tank {
         }, TIME_GAP - 10);
     }
 
-    beDamaged() {
-        
+    healthPointDrop(drop) {
+        this.healthPoint -= drop;
+        if(this.healthPoint <= 0) {
+            $('canvas').removeLayer(this.name);
+            for(var i = 0; i < tankList.length; i++)
+                if(tankList[i] == this) {
+                    tankList.splice(i, 1);
+                    return;
+                }
+        }
     }
 
     fireBullet(x, y) {
@@ -181,8 +189,9 @@ class Tank {
 }
 
 class Creep {
-    constructor(id, x, y, shape, radius, rotate, damage, healthPoint, experience)
+    constructor(name, id, x, y, shape, radius, rotate, damage, healthPoint, experience)
     {
+        this.name = name
         this.id = id        // key
         this.x = x
         this.y = y
@@ -207,7 +216,7 @@ class Creep {
         this.damage = 10;
         this.healthPoint = 30;
         this.experience = 100;
-        this.pointer = document.createElement('creep' + String(this.id))
+        this.pointer = document.createElement(this.name)
         this.drawOnMap();
     }
 
@@ -230,14 +239,24 @@ class Creep {
         });
     }
     
-    beDamaged() {
-        
+    healthPointDrop(drop) {
+        this.healthPoint -= drop;
+        console.log(this.healthPoint);
+        if(this.healthPoint <= 0) {
+            $('canvas').removeLayer(this.name);
+            for(var i = 0; i < creepList.length; i++)
+                if(creepList[i] == this) {
+                    creepList.splice(i, 1);
+                    return;
+                }
+        }
     }
 }
 
 class Bullet {
-    constructor(id, x, y, shape, radius, xMoveSpeed, yMoveSpeed, damage, tankName)
+    constructor(name, id, x, y, shape, radius, xMoveSpeed, yMoveSpeed, damage, tankName)
     {
+        this.name = name
         this.id = id
         this.x = x
         this.y = y
@@ -250,8 +269,8 @@ class Bullet {
     }
 
     initialize(tank, id, dx, dy) {
-        console.log(dx, dy);
         this.id = id;
+        this.healthPoint = 1;
         this.name = this.tankName + 'bullet' + String(this.id);
         var line = Math.sqrt(dx * dx + dy * dy);
         this.shape = CIRCLE;
@@ -262,6 +281,7 @@ class Bullet {
         this.yMoveSpeed = 6.0 * dy / line;
         this.damage = tank.bulletDamage;
         this.tankName = tank.name;
+        this.pointer = document.createElement(this.name)
         this.justifyPosition();
         this.drawOnMap();
         this.moveOnMap();
@@ -300,31 +320,44 @@ class Bullet {
         $('canvas').animateLayer(this.name, {
             x: this.x + this.xMoveSpeed * time, 
             y: this.y + this.yMoveSpeed * time
-        }, time * 10);
+        }, time * 30);
     }    
+
+    healthPointDrop(drop) {
+        this.healthPoint -= drop;
+        if(this.healthPoint <= 0) {
+            $('canvas').removeLayer(this.name);
+            for(var i = 0; i < bulletList.length; i++)
+                if(bulletList[i] == this) {
+                    bulletList.splice(i, 1);
+                    return;
+                }
+        }
+    }
 }
 
 function isCollided(object1, object2) {  // 判断两物块是否碰撞
-    var dx = (object1.x - object2.x);
-    var dy = (object1.y - object2.y);
+    var x1 = $('canvas').getLayer(object1.name).x
+    var x2 = $('canvas').getLayer(object2.name).x
+    var y1 = $('canvas').getLayer(object1.name).y
+    var y2 = $('canvas').getLayer(object2.name).y
+    var dx = (x2 - x1), dy = (y2 - y1);
+    // var dx = (object1.x - object2.x);
+    // var dy = (object1.y - object2.y);
     var dis = dx * dx + dy * dy;
     return dis <= (object1.radius + object2.radius) * (object1.radius + object2.radius);
 }
 
 function checkCollision(object1, object2) { // 碰撞后修改参数
-    // console.log(object1, object2);
     if(isCollided(object1, object2) == false)
         return;
-    alert('PANG!');
-    if(typeof(object1) == Tank || typeof(object1) == Creep)
-        object1.healthPoint -= object2.damage;
-    if(typeof(object2) == Tank || typeof(object2) == Creep)
-        object2.healthPoint -= object1.damage;    
+    object1.healthPointDrop(object2.damage);
+    object2.healthPointDrop(object1.damage);
     // TODO: 碰撞动画 & 其他参数修改
-    // object1.xMoveSpeed = -object1.xMoveSpeed;
-    // object1.yMoveSpeed = -object1.yMoveSpeed;
-    // object2.xMoveSpeed = -object2.xMoveSpeed;
-    // object2.yMoveSpeed = -object2.yMoveSpeed;
+    // object1.xMoveSpeed = -object1.xMoveSpeed * 2;
+    // object1.yMoveSpeed = -object1.yMoveSpeed * 2;
+    // object2.xMoveSpeed = -object2.xMoveSpeed * 2;
+    // object2.yMoveSpeed = -object2.yMoveSpeed * 2;
 }
 
 function globalCollision() {    // 枚举所有pair, 检测碰撞
@@ -351,14 +384,6 @@ function globalMove() {
     tank.modifySpeed();
     tank.moveOnMap();
 }
-
-var tank = new Tank();
-tank.initialize('tank1');
-tankList.push(tank);
-
-var creep1 = new Creep();
-creep1.initialize(id=1);
-creepList.push(creep1);
 
 document.onkeydown = function(ev) {
     var kEvent = ev || window.event;
@@ -390,6 +415,17 @@ document.onmousedown = function(ev) {
     var x = Math.round(mEvent.clientX - cvsBox.left);
     var y = Math.round(mEvent.clientY - cvsBox.top);
     tank.fireBullet(x, y);
+}
+
+
+var tank = new Tank();
+tank.initialize('tank');
+tankList.push(tank);
+
+for(var i = 0 ; i < 10 ; i++) {
+    var creep = new Creep();
+    creep.initialize(id=i);
+    creepList.push(creep);
 }
 
 function main() {
