@@ -1,390 +1,580 @@
+var canvas = document.getElementById('canvas');
+var ctx = canvas.getContext('2d');
+var cvsBox = canvas.getBoundingClientRect();
+
 const CANVAS_LEFT = 50;
-const CANVAS_RIGHT = 950;
 const CANVAS_BOTTOM = 50;
-const CANVAS_TOP = 950;
-const CANVAS_WIDTH = 900;
-const CANVAS_HEIGHT = 900;
+const CANVAS_RIGHT = canvas.clientWidth - 50;
+const CANVAS_TOP = canvas.clientHeight - 50;
+const CANVAS_WIDTH = canvas.clientWidth;
+const CANVAS_HEIGHT = canvas.clientHeight;
 
 const MAX_PLAYER_NUMBER = 30;
 const MAX_TANK_GRADE = 30;
-const SPEED_UP_RATE = 3; 
-const SPEED_DOWN_RATE = 2;      // 地图的水平&垂直阻力
-
-const TIME_GAP = 150;
-const ANIMATE_TIME_GAP = 70;
 const KEYBOARD_UP = 87;
 const KEYBOARD_DOWN = 83;
 const KEYBOARD_LEFT = 65;
 const KEYBOARD_RIGHT = 68;
 
-const HEALTH_POINT = 1;
-const REGENERATION_RATE = 2;
-const MOVE_SPEED = 3;
-const BODY_DAMAGE = 4;
-const RELOAD_RATE = 5;
-const MAX_BULLET_DISTANCE = 6;
-
-const TRIANGLE = 3;
-const SQUARE = 4;
-const PENTAGON = 5;
-const CIRCLE = 0;
-
 var KEYBOARD_CONDITION = 0;   // 0000 UP DOWN LEFT RIGHT
-var canvas = document.getElementById("canvas");
 
-var tankList = [];
-var bulletList = [];
-var creepList = [];
+// tools
+var tools = {};
 
-class Tank {
-    constructor(name, x, y, radius, rotate, xMoveSpeed, yMoveSpeed, type, grade, 
-        healthPoint, regenerationRate, damage, reloadRate, maxBulletDistance, bullet) {
-        this.name = name        // key
-        this.x = x
-        this.y = y
-        this.radius = radius
-        this.rotate = rotate
-        this.type = type
-    
-        // 可升级属性
-        this.grade = grade
-        this.healthPoint = healthPoint
-        this.regenerationRate = regenerationRate
-        this.xMoveSpeed = xMoveSpeed
-        this.yMoveSpeed = yMoveSpeed
-        this.damage = damage
-        this.reloadRate = reloadRate
-        this.maxBulletDistance = maxBulletDistance
-        this.bullet = bullet
-    }
+tools.deg2Rad = function(deg) {
+    return (deg % 360) * (Math.PI / 180);
+};
 
-    initialize(name) {
-        /*
-        input: Tank Name
-        function: Initialize attributes of tank & Draw it on map.
-        */
-        this.name = name;
-        this.bulletNum = 0;
-        this.x = CANVAS_LEFT + Math.ceil(Math.random() * CANVAS_WIDTH);
-        this.y = CANVAS_BOTTOM + Math.ceil(Math.random() * CANVAS_HEIGHT);
-        this.radius = 25;
-        this.rotate = Math.ceil(360 * Math.random());
-        this.xMoveSpeed = 0;
-        this.yMoveSpeed = 0;
-        this.type = 1;
-        this.grade = 1;
-        this.healthPoint = 100;
-        this.regenerationRate = 1;
-        this.damage = 10;
-        this.reloadRate = 1;
-        this.maxBulletDistance = 100;
-        this.bulletDamage = 30;
-        this.pointer = document.createElement(this.name)
-        this.drawOnMap();
-    }
-
-    drawOnMap() {
-        $('canvas').drawArc({
-            layer: true,
-            name: this.name,
-            fillStyle: '#589',
-            x: this.x, y: this.y,
-            radius: this.radius,
-            rotate: this.rotate
-        })
-    }
-
-    upgrade(attribute) {
-        /*
-        input: 要加点的属性
-        function: 加点
-        */
-        if(this.grade == MAX_TANK_GRADE)
-            return 0;
-        this.grade = this.grade + 1;
-        switch(attribute) {
-            case HEALTH_POINT: this.healthPoint += 1; break;
-            case REGENERATION_RATE: this.regenerationRate += 1; break;
-            case MOVE_SPEED: this.moveSpeed += 1; break;
-            case BODY_DAMAGE: this.bodyDamage += 1; break;
-            case RELOAD_RATE: this.reloadRate += 1; break;
-            case MAX_BULLET_DISTANCE: this.maxBulletDistance += 1; break;
-            // case BULLET: break;
-            default: return -1;
+tools.vec2Deg = function () {
+    var radianToDegreesFactor = 180 / Math.PI;
+    return function (x, y) {
+        if (x == 0 && y == 0) {
+            return 360;
         }
-        return 0;
+        rad = Math.atan(y / x);
+        var result = rad * radianToDegreesFactor;
+        if (x < 0) {
+            result += 180;
+        }
+        if (result < 0) {
+            result += 360;
+        }
+        return result;
     }
+}();
 
-    modifySpeed() {
-        /*
-        function: modify xMoveSpeed and yMoveSpeed
-        */
-        var xDirection = 0, yDirection = 0;
-        if(KEYBOARD_CONDITION & 8) yDirection -= 1;
-        if(KEYBOARD_CONDITION & 4) yDirection += 1;
-        if(KEYBOARD_CONDITION & 2) xDirection -= 1;
-        if(KEYBOARD_CONDITION & 1) xDirection += 1;
 
-        this.xMoveSpeed += xDirection * SPEED_UP_RATE;
-        this.yMoveSpeed += yDirection * SPEED_UP_RATE;
-        if(this.xMoveSpeed > SPEED_DOWN_RATE)
-            this.xMoveSpeed -= SPEED_DOWN_RATE;
-        if(this.xMoveSpeed < -SPEED_DOWN_RATE)
-            this.xMoveSpeed += SPEED_DOWN_RATE;  
-        if(this.yMoveSpeed > SPEED_DOWN_RATE)
-            this.yMoveSpeed -= SPEED_DOWN_RATE;
-        if(this.yMoveSpeed < -SPEED_DOWN_RATE)
-            this.yMoveSpeed += SPEED_DOWN_RATE;  
-    }
+var modelList = [];
+var attrLevel = [0, 0, 0, 0, 0, 0, 0];
+var levelUpThreshold = [0, 1000, 2000, 3000, 4000, 5000];
 
-    justifyPosition() {
-        /*
-        function: 使图像不超出画布
-        */
-        if(this.x > CANVAS_RIGHT || this.x < CANVAS_LEFT)
-            this.xMoveSpeed = 0;
-        if(this.y > CANVAS_TOP || this.y < CANVAS_BOTTOM)
-            this.yMoveSpeed = 0;
-        this.x = Math.max(this.x, CANVAS_LEFT);
-        this.x = Math.min(this.x, CANVAS_RIGHT);
-        this.y = Math.max(this.y, CANVAS_BOTTOM);
-        this.y = Math.min(this.y, CANVAS_TOP);
-    }
+// Hcanvas part
+function showBoostMenu(marginLeft = 10, marginTop = 520) {
+    const menuColor = ['#e6af88', '#e666ea', '#9466e9', '#6690ea', '#ea6666', '#93ea66', '#66eae6'];
+    const attrName = ['Health Regen', 'Max Health', 'Body Damage', 'Bullet Speed', 'Bullet Damage', 'Reload', 'Movement Speed'];
+    const H = 20;  // Height
+    const W = 220; // Width
+    let Lm = marginLeft; // Left Margin
+    let Tm = marginTop; // Top Margin
 
-    moveOnMap() {
-        /*
-        function: 每个时间片坦克进行一次移动, x+=delta(x), y+=delta(y)
-        */
-        // var curx = this.x;
-        // var cury = this.y;
-        this.x += this.xMoveSpeed;
-        this.y += this.yMoveSpeed;
-        this.justifyPosition()
-        $('canvas').animateLayer(this.name, {
-            x: this.x, y: this.y
-        }, TIME_GAP - 10);
-    }
-
-    healthPointDrop(drop) {
-        this.healthPoint -= drop;
-        if(this.healthPoint <= 0) {
-            $('canvas').removeLayer(this.name);
-            for(var i = 0; i < tankList.length; i++)
-                if(tankList[i] == this) {
-                    tankList.splice(i, 1);
+    for(let i = 0; i < menuColor.length; i++) {
+        $('#Hcanvas').drawRect({
+            fillStyle: '#383838',
+            x: Lm + W/2, y: Tm + H/2,
+            width: W,
+            height: H,
+            opacity: 0.8,
+            cornerRadius: H/2,
+            layer: true
+        }).drawRect({
+            fillStyle: menuColor[i],
+            x: Lm + 2, y: Tm + H/2,
+            width: 0,
+            height: H - 4,
+            cornerRadius: H/2 - 2,
+            layer: true,
+            name: 'boostRect' + i,
+            groups: ['boostRects']
+        }).drawArc({
+            fillStyle: menuColor[i],
+            x: Lm + W - H/2, y: Tm + H/2,
+            radius: H/2 - 2,
+            layer: true,
+            click: function(layer) {
+                if($(this).getLayer('boostRect' + i).width >= 180)
                     return;
-                }
-        }
-    }
-
-    fireBullet(x, y) {
-        /*
-        function: Fire a bullet & draw the bullet on the map
-        */
-        var bullet = new Bullet();
-        this.bulletNum ++;
-        bullet.initialize(this, this.bulletNum, x - this.x, y - this.y);
-        bulletList.push(bullet);
-    }
-}
-
-class Creep {
-    constructor(name, id, x, y, shape, radius, rotate, damage, healthPoint, experience)
-    {
-        this.name = name
-        this.id = id        // key
-        this.x = x
-        this.y = y
-        this.shape = shape
-        this.radius = radius
-        this.rotate = rotate
-        this.damage = damage
-        this.healthPoint = healthPoint
-        this.experience = experience    // 经验值
-    }
-
-    initialize(id) {
-        this.id = id
-        this.name = 'creep' + String(this.id)
-        this.x = CANVAS_LEFT + Math.ceil(Math.random() * CANVAS_WIDTH);
-        this.y = CANVAS_BOTTOM + Math.ceil(Math.random() * CANVAS_HEIGHT);
-        this.shape = SQUARE;
-        this.radius = 14;
-        this.rotate = Math.ceil(360 * Math.random());
-        this.xMoveSpeed = 0;
-        this.yMoveSpeed = 0;
-        this.damage = 10;
-        this.healthPoint = 30;
-        this.experience = 100;
-        this.pointer = document.createElement(this.name)
-        this.drawOnMap();
-    }
-
-    getColor() {
-        switch(this.shape) {
-            case TRIANGLE: return 'red'
-            case SQUARE: return 'yellow';
-            case PENTAGON: return 'purple';
-        }
-    }
-
-    drawOnMap() {
-        $('canvas').drawPolygon({
+                $(this).setLayer('boostRect' + i, {
+                    x: '+=10',
+                    width: '+=20'
+                }).drawLayers();
+                attrLevel[i] += 1;
+            }
+        }).drawText({
+            fillStyle: '#ffffff',
+            x: Lm + W/2 - 20, y: Tm + H/2,
+            fontSize: 12,
+            fontStyle: 'bold',
+            fontFamily: 'Ubuntu, sans-serif',
+            text: attrName[i],
+            align: 'center',
+            mask: true,
+            layer: true
+        }).drawText({
+            fillStyle: '#ffffff',
+            x: Lm + W - 30, y: Tm + H/2,
+            fontSize: 10,
+            fontStyle: 'bold',
+            fontFamily: 'Ubuntu, sans-serif',
+            text: '[' + (i + 1) + ']',
+            align: 'right',
+            mask: true,
+            layer: true
+        }).drawLine({
+            strokeStyle: '#525252',
+            strokeWidth: 4,
+            x1: Lm + W - H/2 - 5, y1: Tm + H/2,
+            x2: Lm + W - H/2 + 5, y2: Tm + H/2,
             layer: true,
-            name: this.name,
-            fillStyle: this.getColor(),
-            x: this.x, y: this.y,
-            radius: this.radius * 2,
-            sides: this.shape
+            intangible: true
+        }).drawLine({
+            strokeStyle: '#525252',
+            strokeWidth: 4,
+            x1: Lm + W - H/2, y1: Tm + H/2 - 5,
+            x2: Lm + W - H/2, y2: Tm + H/2 + 5,
+            layer: true,
+            intangible: true
         });
+        Tm += 25;
     }
-    
-    healthPointDrop(drop) {
-        this.healthPoint -= drop;
-        console.log(this.healthPoint);
-        if(this.healthPoint <= 0) {
-            $('canvas').removeLayer(this.name);
-            for(var i = 0; i < creepList.length; i++)
-                if(creepList[i] == this) {
-                    creepList.splice(i, 1);
-                    return;
-                }
-        }
-    }
+};
+
+function drawBottomBar() {
+    // experience Bar
+    $('#Hcanvas').drawRect({      
+        layer: true,
+        name: 'expBar',
+        fillStyle: '#3e3e3e',
+        x: (CANVAS_LEFT + CANVAS_RIGHT) / 2, 
+        y: CANVAS_TOP,
+        width: 350,
+        height: 20,
+        cornerRadius: 10,
+        opacity: 0.5,
+    }).drawText({
+        x: (CANVAS_LEFT + CANVAS_RIGHT) / 2, 
+        y: CANVAS_TOP,
+        layer: true,
+        fillStyle: '#ffffff',
+        fontSize: 15,
+        fontStyle: 'bold',
+        fontFamily: 'Ubuntu, sans-serif',
+        text: 'level n',
+        align: 'center',
+        mask: true
+    });
+    // health Bar
+    $('#Hcanvas').drawRect({
+        layer: true,
+        name: 'healthBar',
+        fillStyle: '#3e3e3e',
+        x: (CANVAS_LEFT + CANVAS_RIGHT) / 2, 
+        y: CANVAS_TOP - 25,
+        width: 260,
+        height: 20,
+        cornerRadius: 10,
+        opacity: 0.5
+    }).drawText({
+        x: (CANVAS_LEFT + CANVAS_RIGHT) / 2, 
+        y: CANVAS_TOP - 25,
+        layer: true,
+        fillStyle: '#ffffff',
+        fontSize: 12,
+        fontStyle: 'bold',
+        fontFamily: 'Ubuntu, sans-serif',
+        text: 'Score: 0',
+        align: 'center',
+        mask: true
+    });
+    // tankName Text
+    $('canvas').drawText({
+        layer: true,
+        name: 'tankNameText',
+        fillStyle: '#ffffff',
+        strokeStyle: '#000',
+        strokeWidth: 1,
+        fontSize: 30,
+        fontStyle: 'bold',
+        fontFamily: 'Ubuntu, sans-serif',
+        text: 'czy',
+        x: (CANVAS_LEFT + CANVAS_RIGHT) / 2, 
+        y: CANVAS_TOP - 50
+    });
 }
 
-class Bullet {
-    constructor(name, id, x, y, shape, radius, xMoveSpeed, yMoveSpeed, damage, tankName)
+function updateHcanvas() {
+    ratio = maintk.experience / levelUpThreshold[maintk.level];
+    let x = $('#Hcanvas').getLayer('expBar').
+}
+
+drawBottomBar();
+
+// Collision part 
+function isCollided(obj1, obj2) {  // 判断两物块是否碰撞
+    let dx = obj1.model.x - obj2.model.x;
+    let dy = obj1.model.y - obj2.model.y;
+    let dis = dx * dx + dy * dy;
+    let sumr = obj1.r * obj1.model.scaleX + obj2.r * obj2.model.scaleX;
+    return dis <= sumr * sumr;
+}
+
+function checkCollision(obj1, obj2) { // 碰撞后修改参数
+    if(obj1.armsId == obj2.armsId)
+        return false;
+    if(((obj1.armsId >> 2) & 3) == 1 && ((obj2.armsId >> 2) & 3) == 1)    // 子弹之间不能碰撞
+        return false;
+    res = isCollided(obj1, obj2);
+    if(res == false)
+        return false;
+
+    // console.log(obj1, obj2);
+    obj1.healthDrop(obj2.bodyDamage);
+    obj2.healthDrop(obj1.bodyDamage);
+    if(obj2.healthPoint <= 0)
     {
-        this.name = name
-        this.id = id
-        this.x = x
-        this.y = y
-        this.shape = shape
-        this.radius = radius
-        this.xMoveSpeed = xMoveSpeed
-        this.yMoveSpeed = yMoveSpeed
-        this.damage = damage
-        this.tankName = tankName
+        if(obj1.type == 0)       // tank
+            obj1.experienceUp(obj2.bonus);
+        else if(obj1.type == 1)  // bullet
+            obj1.belong.experienceUp(obj2.bonus);
+    }
+    if(obj1.healthPoint <= 0)
+    {
+        if(obj2.type == 0)       // tank
+            obj2.experienceUp(obj1.bonus);
+        else if(obj2.type == 1)  // bullet
+            obj2.belong.experienceUp(obj1.bonus);
     }
 
-    initialize(tank, id, dx, dy) {
-        this.id = id;
-        this.healthPoint = 1;
-        this.name = this.tankName + 'bullet' + String(this.id);
-        var line = Math.sqrt(dx * dx + dy * dy);
-        this.shape = CIRCLE;
-        this.radius = 10;
-        this.x = tank.x + Math.ceil(tank.radius * dx / line) + this.radius;
-        this.y = tank.y + Math.ceil(tank.radius * dy / line) + this.radius;
-        this.xMoveSpeed = 6.0 * dx / line;
-        this.yMoveSpeed = 6.0 * dy / line;
-        this.damage = tank.bulletDamage;
-        this.tankName = tank.name;
-        this.pointer = document.createElement(this.name)
-        this.justifyPosition();
-        this.drawOnMap();
-        this.moveOnMap();
-    }
-
-    drawOnMap() {
-        $('canvas').drawArc({
-            layer: true,
-            name: this.name,
-            fillStyle: 'red',
-            x: this.x,
-            y: this.y,
-            radius: this.radius
-        });
-    }
-
-    justifyPosition() {
-        if(this.x > CANVAS_RIGHT || this.x < CANVAS_LEFT)
-            this.xMoveSpeed = 0;
-        if(this.y > CANVAS_TOP || this.y < CANVAS_BOTTOM)
-            this.yMoveSpeed = 0;
-        this.x = Math.max(this.x, CANVAS_LEFT);
-        this.x = Math.min(this.x, CANVAS_RIGHT);
-        this.y = Math.max(this.y, CANVAS_BOTTOM);
-        this.y = Math.min(this.y, CANVAS_TOP);
-    }
-
-    moveOnMap() {
-        var xTime, yTime, time;
-        if(this.xMoveSpeed > 0) xTime = (CANVAS_RIGHT - this.x) / this.xMoveSpeed;
-        else if(this.xMoveSpeed < 0) xTime = (CANVAS_LEFT - this.x) / this.xMoveSpeed;
-        if(this.yMoveSpeed > 0) yTime = (CANVAS_TOP - this.y) / this.yMoveSpeed;
-        else if(this.yMoveSpeed < 0) yTime = (CANVAS_BOTTOM - this.y) / this.yMoveSpeed;
-        time = Math.min(xTime, yTime);       
-
-        $('canvas').animateLayer(this.name, {
-            x: this.x + this.xMoveSpeed * time, 
-            y: this.y + this.yMoveSpeed * time
-        }, time * 30);
-    }    
-
-    healthPointDrop(drop) {
-        this.healthPoint -= drop;
-        if(this.healthPoint <= 0) {
-            $('canvas').removeLayer(this.name);
-            for(var i = 0; i < bulletList.length; i++)
-                if(bulletList[i] == this) {
-                    bulletList.splice(i, 1);
-                    return;
-                }
-        }
-    }
-}
-
-function isCollided(object1, object2) {  // 判断两物块是否碰撞
-    var x1 = $('canvas').getLayer(object1.name).x
-    var x2 = $('canvas').getLayer(object2.name).x
-    var y1 = $('canvas').getLayer(object1.name).y
-    var y2 = $('canvas').getLayer(object2.name).y
-    var dx = (x2 - x1), dy = (y2 - y1);
-    // var dx = (object1.x - object2.x);
-    // var dy = (object1.y - object2.y);
-    var dis = dx * dx + dy * dy;
-    return dis <= (object1.radius + object2.radius) * (object1.radius + object2.radius);
-}
-
-function checkCollision(object1, object2) { // 碰撞后修改参数
-    if(isCollided(object1, object2) == false)
-        return;
-    object1.healthPointDrop(object2.damage);
-    object2.healthPointDrop(object1.damage);
     // TODO: 碰撞动画 & 其他参数修改
-    // object1.xMoveSpeed = -object1.xMoveSpeed * 2;
-    // object1.yMoveSpeed = -object1.yMoveSpeed * 2;
-    // object2.xMoveSpeed = -object2.xMoveSpeed * 2;
-    // object2.yMoveSpeed = -object2.yMoveSpeed * 2;
+    // let destX = obj1.model.x - obj1.xMoveSpeed;
+    // let destY = obj1.model.y - obj1.yMoveSpeed;
+    // obj1.ban = 1;       // 禁止使用键盘移动
+    // createjs.Tween.get(obj1.model).to({x: destX, y: destY}, 20).call(handleComplete1);
+    // function handleComplete1() {obj1.ban = 0;}
+
+    // destX = obj2.model.x - obj2.xMoveSpeed;
+    // destY = obj2.model.y - obj2.yMoveSpeed;
+    // createjs.Tween.get(obj2.model).to({x: destX, y: destY}, 20);
+    // obj2.ban = 1;
+    // createjs.Tween.get(obj1.model).to({x: destX, y: destY}, 20).call(handleComplete2);
+    // function handleComplete2() {obj2.ban = 0;}
+
+    return true;
 }
 
-function globalCollision() {    // 枚举所有pair, 检测碰撞
-    // Tank - Tank
-    for(var i = 0; i < tankList.length; i++)
-        for(var j = i + 1; j < tankList.length; j++)
-            checkCollision(tankList[i], tankList[j]);
-    // Tank - Bullet
-    for(var i = 0; i < tankList.length; i++)
-        for(var j = 0; j < bulletList.length; j++)
-            if(tankList[i].name != bulletList[j].tankName)   // 自己的子弹不能打自己
-                checkCollision(tankList[i], bulletList[j]);
-    // Tank - Creep
-    for(var i = 0; i < tankList.length; i++)
-        for(var j = 0; j < creepList.length; j++)
-            checkCollision(tankList[i], creepList[j]);
-    // Bullet - Creep
-    for(var i = 0; i < bulletList.length; i++)
-        for(var j = 0; j < creepList.length; j++)
-            checkCollision(bulletList[i], creepList[j]);
+
+// BaseModel part
+function BaseModel (modelX, modelY, armsId = 0) {
+    this.model = new createjs.Container();
+    this.heads = new createjs.Container();
+    this.headOuterRadius = [];
+    this.body = new createjs.Shape();
+    this.health = new createjs.Shape();
+    this.status = new createjs.Text();
+
+    this.type = 0;
+    this.model.x = modelX;
+    this.model.y = modelY;
+    this.model.scaleX = 0.8;
+    this.model.scaleY = 0.8;
+    this.armsId = armsId;
+    this.bodyStrokeColor = '#000';
+    this.bodyFillColor = '#000';
+    this.r = 0;
+    this.name = 'Tank';
+
+    this.ban = 0;
+
+    this.setBodyColor('', '', 1);
+    this.decorate(this.armsId);
+    this.model.addChild(this.heads);
+    this.model.addChild(this.body);
+    this.model.addChild(this.health);
+    this.model.addChild(this.status);
 }
 
-function globalMove() {
-    tank.modifySpeed();
-    tank.moveOnMap();
+BaseModel.prototype.setBodyColor = function (strokeColor, fillColor, builtInColorStyle = 0) {
+    switch(builtInColorStyle) {
+        case 1: this.bodyStrokeColor = '#1f90ae', this.bodyFillColor = '#00b2e1'; break;
+        case 2: this.bodyStrokeColor = '#bfae4e', this.bodyFillColor = '#ffe869'; break;
+        case 3: this.bodyStrokeColor = '#c28081', this.bodyFillColor = '#fc7677'; break;
+        case 4: this.bodyStrokeColor = '#5869bd', this.bodyFillColor = '#768dfc'; break;
+        case 5: this.bodyStrokeColor = '#b43a3f', this.bodyFillColor = '#f14e54'; break;
+        default: this.bodyStrokeColor = strokeColor, this.bodyFillColor = fillColor;
+    }
 }
 
+BaseModel.prototype.decorate = function (armsId) {
+    this.headDecorate(armsId >> 4);
+    this.bodyDecorate(armsId & 3);
+    if(((armsId >> 2) & 3) != 1) {
+        // 不是子弹，画血条
+        this.health.graphics.clear().f('#555555').rr(-30, this.r  + 10, 60, 8, 4);
+        this.health.graphics.f('#85e37d').rr(-28, this.r  + 12, 56, 4, 2);
+    }
+    if(((armsId >> 2) & 3) == 0) { 
+        // 是坦克，画状态 [未启用]
+        this.status.text = this.name;
+        this.status.font = 'bold 20px Ubuntu';
+        this.status.color = '#000000';
+        this.status.x = 0;
+        this.status.y = -this.r - 30;
+        this.status.textAlign = 'center';
+        this.status.visible = false;
+    }
+    this.armsId = armsId;
+}
+
+BaseModel.prototype.headDecorate = function (headId) {
+    headShapes = [];
+    this.headOuterRadius.length = 0;
+    
+    switch(headId) {
+        case 0: // 无炮管
+            break;
+        case 1: // 矩形炮管 * 1
+            headShapes.push(new createjs.Shape());
+            this.headOuterRadius.push(60);
+            headShapes[0].graphics.ss(4).s('#727272').f('#999999').dr(0, -15, 60, 30);
+            break;
+        case 2: // 矩形长炮管 * 1
+            headShapes.push(new createjs.Shape());
+            this.headOuterRadius.push(70);
+            headShapes[0].graphics.ss(4).s('#727272').f('#999999').dr(0, -15, 70, 30);
+            break;
+        case 3: // 矩形炮管 * 1 + 矩形短炮管 * 1
+            headShapes.push(new createjs.Shape(), new createjs.Shape());
+            this.headOuterRadius.push(60, 45);
+            headShapes[0].graphics.ss(4).s('#727272').f('#999999').dr(0, -15, 60, 30);
+            headShapes[1].graphics.ss(4).s('#727272').f('#999999').dr(0, -15, 45, 30);
+            headShapes[1].rotation = 180;
+            break;
+        case 4: // 梯形炮管 * 1
+            headShapes.push(new createjs.Shape());
+            this.headOuterRadius.push(60);
+            headShapes[0].graphics.ss(4).s('#727272').f('#999999');
+            headShapes[0].graphics.mt(-30, 0).lt(60, -20).mt(58, -20).lt(58, 20).mt(60, 20).lt(-30, 0);
+            break;
+        case 5: // 双发炮管 * 1
+            headShapes.push(new createjs.Shape(), new createjs.Shape());
+            this.headOuterRadius.push(60, 60);
+            headShapes[0].graphics.ss(4).s('#727272').f('#999999').dr(0, -20, 60, 17);
+            headShapes[1].graphics.ss(4).s('#727272').f('#999999').dr(0, 3, 60, 17);
+            break;
+        case 6: // 三发炮管 * 1
+            headShapes.push(new createjs.Shape(), new createjs.Shape(), new createjs.Shape());
+            this.headOuterRadius.push(50, 50, 50);
+            headShapes[0].graphics.ss(4).s('#727272').f('#999999').dr(0, -10, 50, 20);
+            headShapes[1].graphics.ss(4).s('#727272').f('#999999').dr(0, -10, 50, 20);
+            headShapes[1].rotation = 315;
+            headShapes[2].graphics.ss(4).s('#727272').f('#999999').dr(0, -10, 50, 20);
+            headShapes[2].rotation = 45;
+            break;
+        case 7: // 矩形炮管 * 4
+            headShapes.push(new createjs.Shape(), new createjs.Shape(), new createjs.Shape(), new createjs.Shape());
+            this.headOuterRadius.push(60, 60, 60, 60);
+            headShapes[0].graphics.ss(4).s('#727272').f('#999999').dr(0, -15, 60, 30);
+            headShapes[1].graphics.ss(4).s('#727272').f('#999999').dr(0, -15, 60, 30);
+            headShapes[1].rotation = 90;
+            headShapes[2].graphics.ss(4).s('#727272').f('#999999').dr(0, -15, 60, 30);
+            headShapes[2].rotation = 180;
+            headShapes[3].graphics.ss(4).s('#727272').f('#999999').dr(0, -15, 60, 30);
+            headShapes[3].rotation = 270;
+            break;
+        default:
+            alert('How can you reach here ?');
+            break;
+    }
+    this.heads.removeAllChildren();
+    for(let i = 0; i < headShapes.length; i++)
+        this.heads.addChild(headShapes[i]);
+    this.heads.scaleX = this.heads.scaleY = 1;
+}
+
+BaseModel.prototype.bodyDecorate = function (bodyId) {
+    this.body.graphics.clear().ss(4).s(this.bodyStrokeColor).f(this.bodyFillColor);
+    switch(bodyId) {
+        case 0: // 圆形底座
+            this.body.graphics.dc(0, 0, 30); 
+            this.r = 30; break;
+        case 1: // 方形底座
+            this.body.graphics.dr(-20, -20, 40, 40); 
+            this.r = 20; break;
+        case 2: // 正三角形
+            this.body.graphics.dp(0, 0, 20, 3, 0, 0); 
+            this.r = 10; break;
+        case 3: // 正五边形
+            this.body.graphics.dp(0, 0, 40, 5, 0, 0);
+            this.r = 32.4; break;
+        default:
+            alert('How can you reach here ?'); break;
+    }
+    this.body.scaleX = this.body.scaleY = 1;
+}
+
+BaseModel.prototype.setHealthCond = function (ratio) {
+    if(ratio < 0.0 || ratio > 1.0) return;
+    if(((this.armsId >> 2) & 3) != 1) {
+        // 不是子弹，画血条
+        this.health.graphics.clear().f('#555555').rr(-30, this.r  + 10, 60, 8, 4);
+        this.health.graphics.f('#85e37d').rr(-28, this.r  + 12, 56 * ratio, 4, 2);
+    }
+}
+
+// GeneralModel part
+function GeneralModel (modelX, modelY, armsId) {
+    BaseModel.call(this, modelX, modelY, armsId);
+    this.type = 0;
+    this.bonus = 800;
+    this.healthPoint = 100;
+    this.maxHealthPoint = 100;
+    this.xMoveSpeed = 0;
+    this.yMoveSpeed = 0;
+    this.maxMoveSpeed = 5;
+    this.bodyDamage = 30;
+}
+
+GeneralModel.prototype = new BaseModel();
+GeneralModel.prototype.constructor = GeneralModel;
+
+GeneralModel.prototype.healthDrop = function(damage) {
+    this.healthPoint -= damage;
+    if(this.healthPoint < 0)
+        this.healthPoint = 0;
+    this.setHealthCond(this.healthPoint / this.maxHealthPoint);
+    if(this.healthPoint <= 0) {
+        for(let i = 0; i < modelList.length; i++)
+            if(this == modelList[i]) {
+                modelList.splice(i, 1);
+                break;
+            }
+        createjs.Tween.removeTweens(this.model);
+        stage.removeChild(this.model);
+    }
+}
+
+
+// Tank part
+function Tank (modelX, modelY, armsId = 0) {
+    GeneralModel.call(this, modelX, modelY, armsId);
+    this.type = 0;
+    this.level = 1;
+    this.experience = 0;
+    this.reloadRate = 10;
+    this.regenerationRate = 10;
+}
+
+Tank.prototype = new GeneralModel();
+Tank.prototype.constructor = Tank;
+
+Tank.prototype.levelUp = function() {
+    if(this.level == MAX_TANK_GRADE)
+        return 0;
+    this.level ++;
+    showBoostMenu();    // 显示加点条
+    return 0;
+}
+
+Tank.prototype.experienceUp = function(exp) {
+    this.experience += exp;
+    updateHcanvas();
+    if(this.experience >= levelUpThreshold[this.level]) {
+        this.experience -= levelUpThreshold[this.level];
+        this.levelUp();
+    }
+}
+
+Tank.prototype.tankMove = function() {
+
+    if(this.healthPoint <= 0 || this.ban == 1)
+        return;
+    this.xMoveSpeed = 0;
+    this.yMoveSpeed = 0;
+    if(KEYBOARD_CONDITION & 8) this.yMoveSpeed = -this.maxMoveSpeed;
+    if(KEYBOARD_CONDITION & 4) this.yMoveSpeed = this.maxMoveSpeed;
+    if(KEYBOARD_CONDITION & 2) this.xMoveSpeed = -this.maxMoveSpeed;
+    if(KEYBOARD_CONDITION & 1) this.xMoveSpeed = this.maxMoveSpeed;
+
+    if(this.xMoveSpeed != 0 && this.yMoveSpeed != 0) {
+        console.log('yeah');
+        this.xMoveSpeed *= Math.sqrt(2) / 2;
+        this.yMoveSpeed *= Math.sqrt(2) / 2;
+    }
+
+    this.model.x += this.xMoveSpeed;
+    this.model.y += this.yMoveSpeed;
+
+    for(let i = 0; i < modelList.length; i++) {
+        if(checkCollision(this, modelList[i]) == true)
+            break;
+    }
+}
+
+Tank.prototype.fireBullet = function() {    
+    for(let i = 0; i < this.heads.numChildren; i++) {
+        let angle = tools.deg2Rad(this.heads.rotation + this.heads.getChildAt(i).rotation)
+        let bulletX = this.headOuterRadius[i] * Math.cos(angle);
+        let bulletY = this.headOuterRadius[i] * Math.sin(angle);
+        let bullet = new Bullet(this.model.x + bulletX, this.model.y + bulletY, armsId = 4, this);  // 01 00 
+        bullet.healthPoint = 1;
+        bullet.xMoveSpeed = bullet.maxMoveSpeed * Math.cos(angle);
+        bullet.yMoveSpeed = bullet.maxMoveSpeed * Math.sin(angle);
+        modelList.push(bullet);
+        stage.addChild(bullet.model);
+        bullet.bulletMove();
+    }
+}
+
+
+// Bullet part
+function Bullet (modelX, modelY, armsId = 4, belong) {
+    GeneralModel.call(this, modelX, modelY, armsId);
+    this.type = 1;
+    this.belong = belong;
+    this.model.scaleX = 0.4;
+    this.model.scaleY = 0.4;
+    this.bonus = 0;
+}
+
+Bullet.prototype = new GeneralModel();
+Bullet.prototype.constructor = Bullet;
+
+Bullet.prototype.bulletMove = function() {
+    let xTime, yTime, This = this;
+
+    if(this.xMoveSpeed > 0) xTime = (CANVAS_RIGHT - this.model.x) / this.xMoveSpeed;
+    else if(this.xMoveSpeed < 0) xTime = (CANVAS_LEFT - this.model.x) / this.xMoveSpeed;
+    if(this.yMoveSpeed > 0) yTime = (CANVAS_TOP - this.model.y) / this.yMoveSpeed;
+    else if(this.yMoveSpeed < 0) yTime = (CANVAS_BOTTOM - this.model.y) / this.yMoveSpeed;
+    let time = Math.min(xTime, yTime);       
+
+    let destX = this.model.x + this.xMoveSpeed * time;
+    let destY = this.model.y + this.yMoveSpeed * time;
+
+    // this.model.x = destX;
+    // this.model.y = destY;
+    createjs.Tween.get(this.model).to({x: destX, y: destY}, 30 * time).
+        call(handleComplete).
+        addEventListener('change', handleChange);
+    
+    function handleChange(event) {
+        for(let i = 0; i < modelList.length; i++) {
+            if(checkCollision(This, modelList[i]) == true)
+                break;
+        }
+    }
+
+    function handleComplete() {
+        stage.removeChild(This.model);
+        for(let i = 0; i < modelList.length; i++)
+            if(This == modelList[i]) {
+                modelList.splice(i, 1);
+                break;
+            }
+    };
+}
+
+
+// Creep part
+function Creep (modelX, modelY, armsId = 0) {
+    GeneralModel.call(this, modelX, modelY, armsId);
+    this.type = 2;
+}
+
+Creep.prototype = new GeneralModel();
+Creep.prototype.constructor = Creep;
+
+
+// KeyBoard Event & Mouse Event
 document.onkeydown = function(ev) {
     var kEvent = ev || window.event;
     if(kEvent.keyCode == KEYBOARD_UP)
@@ -409,31 +599,47 @@ document.onkeyup = function(ev) {
         KEYBOARD_CONDITION &= 14;
 }
 
-document.onmousedown = function(ev) {
+document.onmousemove = function(ev) {
     var mEvent = ev || window.event;
-    var cvsBox = canvas.getBoundingClientRect();
-    var x = Math.round(mEvent.clientX - cvsBox.left);
-    var y = Math.round(mEvent.clientY - cvsBox.top);
-    tank.fireBullet(x, y);
+    let x = Math.round(mEvent.clientX - cvsBox.left - stage.x);
+    let y = Math.round(mEvent.clientY - cvsBox.top - stage.y);
+    maintk.heads.rotation = tools.vec2Deg(x - maintk.model.x, y - maintk.model.y)
+    stage.update();
+}
+
+document.onmousedown = function(ev) {
+    maintk.fireBullet();
 }
 
 
-var tank = new Tank();
-tank.initialize('tank');
-tankList.push(tank);
+// 实例
+var stage = new createjs.Stage('canvas');
+var arms = [0, 16, 32, 48, 64, 80, 96, 112];
+createjs.Ticker.framerate = 60;
+createjs.Ticker.addEventListener('tick', handleTick);
 
-for(var i = 0 ; i < 10 ; i++) {
-    var creep = new Creep();
-    creep.initialize(id=i);
-    creepList.push(creep);
+
+for(let i = 0; i < arms.length; i++) {
+    let tk = new Tank(100 + (i % 4) * 200, 100 + (i / 4) * 200, arms[i]);
+    modelList.push(tk);
+    stage.addChild(tk.model);
+    tk.setBodyColor('', '', Math.ceil(Math.random() * 5));
+    tk.decorate(arms[i + 1]);
+    tk.setHealthCond(1.0);
+    stage.update();
 }
 
-function main() {
+var maintk = modelList[0];
+maintk.model.x = 500;
+maintk.model.y = 500;
+// showBoostMenu();
 
-    var timer = setInterval(function() {
-        globalMove();
-        globalCollision();
-    }, TIME_GAP);
+function handleTick() {
+    stage.x = (canvas.clientWidth >> 1) - maintk.model.x;
+    stage.y = (canvas.clientHeight >> 1) - maintk.model.y;
+    maintk.tankMove();
+    // for(let i = 0; i < modelList.length; i++)
+    //     if(modelList[i].armsId == 4)
+    //         modelList[i].bulletMove();
+    stage.update();
 }
-
-main();

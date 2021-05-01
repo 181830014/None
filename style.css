@@ -1,3 +1,53 @@
-/* hr {color:sienna;}
-p {margin-left:20px;}
-body {background-image:url("/images/shark.jpg");} */
+html {
+    position: relative;
+    width: 100%;
+    height: 100%;
+}
+
+body {
+    width: 100%;
+    height: 100%;
+}
+
+.scoreboard-region {
+    position: absolute;
+    right: 0;
+    top: 0;
+    width: 160px;
+    z-index: 6;
+}
+
+.scoreboard {
+
+}
+
+.info-region {
+    position: absolute;
+    bottom: 0;
+    left: 20%;
+    /* width: 80px; */
+}
+
+.experience-bar {
+    left: 50%;
+    height: 30px;
+    width: 500px;
+    background-color: #1C5428;
+    -moz-border-radius: 16px;
+    -webkit-border-radius: 16px;
+    border-radius: 16px;
+    -webkit-box-shadow: 0 0 2px rgba(0,0,0,0.5) inset;
+    -moz-box-shadow: 0 0 2px rgba(0,0,0,0.5) inset;
+    box-shadow: 0 0 2px rgba(0,0,0,0.5) inset;
+}
+
+.experience-bar > div {
+    width: 100%;
+    height: 100%;
+    -webkit-transition: width 0.5s;
+    -moz-transition: width 0.5s;
+    -o-transition: width 0.5s;
+    -ms-transition: width 0.5s;
+    transition: width 0.5s;
+    background-color: #38CE13;
+}
